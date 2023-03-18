@@ -1,7 +1,6 @@
 using System.IO;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using MediatR.Examples;
 using MediatR.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,7 +20,7 @@ namespace MediatR.Benchmarks
 
             services.AddSingleton(TextWriter.Null);
 
-            services.AddMediatR(typeof(Ping));
+            services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining(typeof(Ping)));
 
             services.AddScoped(typeof(IPipelineBehavior<,>), typeof(GenericPipelineBehavior<,>));
             services.AddScoped(typeof(IRequestPreProcessor<>), typeof(GenericRequestPreProcessor<>));

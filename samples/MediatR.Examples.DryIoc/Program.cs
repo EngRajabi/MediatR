@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using DryIoc;
+using DryIoc.Microsoft.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MediatR.Examples.DryIoc;
 
@@ -19,13 +21,16 @@ class Program
     {
         var container = new Container();
 
-        container.RegisterDelegate<ServiceFactory>(r => r.Resolve);
-        container.UseInstance<TextWriter>(writer);
+        container.Use<TextWriter>(writer);
 
         //Pipeline works out of the box here
 
         container.RegisterMany(new[] { typeof(IMediator).GetAssembly(), typeof(Ping).GetAssembly() }, Registrator.Interfaces);
 
-        return container.Resolve<IMediator>();
+        var services = new ServiceCollection();
+
+        var adapterContainer = container.WithDependencyInjectionAdapter(services);
+
+        return adapterContainer.GetRequiredService<IMediator>();
     }
 }

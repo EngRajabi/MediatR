@@ -6,29 +6,29 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Shouldly;
-using StructureMap;
+using Lamar;
 using Xunit;
 
 public class StreamPipelineTests
 {
     public class Ping : IStreamRequest<Pong>
     {
-        public string Message { get; set; }
+        public string? Message { get; set; }
     }
 
     public class Pong
     {
-        public string Message { get; set; }
+        public string? Message { get; set; }
     }
 
     public class Zing : IStreamRequest<Zong>
     {
-        public string Message { get; set; }
+        public string? Message { get; set; }
     }
 
     public class Zong
     {
-        public string Message { get; set; }
+        public string? Message { get; set; }
     }
 
     public class PingHandler : IStreamRequestHandler<Ping, Pong>
@@ -72,7 +72,7 @@ public class StreamPipelineTests
             _output = output;
         }
 
-        public async IAsyncEnumerable<Pong> Handle(Ping request, [EnumeratorCancellation] CancellationToken cancellationToken, StreamHandlerDelegate<Pong> next)
+        public async IAsyncEnumerable<Pong> Handle(Ping request, StreamHandlerDelegate<Pong> next, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             _output.Messages.Add("Outer before");
             await foreach (var result in next())
@@ -92,7 +92,7 @@ public class StreamPipelineTests
             _output = output;
         }
 
-        public async IAsyncEnumerable<Pong> Handle(Ping request, [EnumeratorCancellation] CancellationToken cancellationToken, StreamHandlerDelegate<Pong> next)
+        public async IAsyncEnumerable<Pong> Handle(Ping request, StreamHandlerDelegate<Pong> next, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             _output.Messages.Add("Inner before");
             await foreach (var result in next())
@@ -113,7 +113,7 @@ public class StreamPipelineTests
             _output = output;
         }
 
-        public async IAsyncEnumerable<TResponse> Handle(TRequest request, [EnumeratorCancellation] CancellationToken cancellationToken, StreamHandlerDelegate<TResponse> next)
+        public async IAsyncEnumerable<TResponse> Handle(TRequest request, StreamHandlerDelegate<TResponse> next, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             _output.Messages.Add("Inner generic before");
             await foreach (var result in next())
@@ -134,7 +134,7 @@ public class StreamPipelineTests
             _output = output;
         }
 
-        public async IAsyncEnumerable<TResponse> Handle(TRequest request, [EnumeratorCancellation] CancellationToken cancellationToken, StreamHandlerDelegate<TResponse> next)
+        public async IAsyncEnumerable<TResponse> Handle(TRequest request, StreamHandlerDelegate<TResponse> next, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             _output.Messages.Add("Outer generic before");
             await foreach (var result in next())
@@ -155,7 +155,7 @@ public class StreamPipelineTests
         {
             _output = output;
         }
-        public async IAsyncEnumerable<TResponse> Handle(TRequest request, [EnumeratorCancellation] CancellationToken cancellationToken, StreamHandlerDelegate<TResponse> next)
+        public async IAsyncEnumerable<TResponse> Handle(TRequest request, StreamHandlerDelegate<TResponse> next, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             _output.Messages.Add("Constrained before");
             await foreach (var result in next())
@@ -175,7 +175,7 @@ public class StreamPipelineTests
             _output = output;
         }
 
-        public async IAsyncEnumerable<Pong> Handle(Ping request, [EnumeratorCancellation] CancellationToken cancellationToken, StreamHandlerDelegate<Pong> next)
+        public async IAsyncEnumerable<Pong> Handle(Ping request, StreamHandlerDelegate<Pong> next, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             _output.Messages.Add("Concrete before");
             await foreach (var result in next())
@@ -204,10 +204,9 @@ public class StreamPipelineTests
                 scanner.WithDefaultConventions();
                 scanner.AddAllTypesOf(typeof(IStreamRequestHandler<,>));
             });
-            cfg.For<Logger>().Singleton().Use(output);
+            cfg.For<Logger>().Use(output);
             cfg.For<IStreamPipelineBehavior<Ping, Pong>>().Add<OuterBehavior>();
             cfg.For<IStreamPipelineBehavior<Ping, Pong>>().Add<InnerBehavior>();
-            cfg.For<ServiceFactory>().Use<ServiceFactory>(ctx => t => ctx.GetInstance(t));
             cfg.For<IMediator>().Use<Mediator>();
         });
 
@@ -241,12 +240,11 @@ public class StreamPipelineTests
                 scanner.WithDefaultConventions();
                 scanner.AddAllTypesOf(typeof(IStreamRequestHandler<,>));
             });
-            cfg.For<Logger>().Singleton().Use(output);
+            cfg.For<Logger>().Use(output);
 
             cfg.For(typeof(IStreamPipelineBehavior<,>)).Add(typeof(OuterBehavior<,>));
             cfg.For(typeof(IStreamPipelineBehavior<,>)).Add(typeof(InnerBehavior<,>));
 
-            cfg.For<ServiceFactory>().Use<ServiceFactory>(ctx => t => ctx.GetInstance(t));
             cfg.For<IMediator>().Use<Mediator>();
         });
 
@@ -280,13 +278,12 @@ public class StreamPipelineTests
                 scanner.WithDefaultConventions();
                 scanner.AddAllTypesOf(typeof(IStreamRequestHandler<,>));
             });
-            cfg.For<Logger>().Singleton().Use(output);
+            cfg.For<Logger>().Use(output);
 
             cfg.For(typeof(IStreamPipelineBehavior<,>)).Add(typeof(OuterBehavior<,>));
             cfg.For(typeof(IStreamPipelineBehavior<,>)).Add(typeof(InnerBehavior<,>));
             cfg.For(typeof(IStreamPipelineBehavior<,>)).Add(typeof(ConstrainedBehavior<,>));
 
-            cfg.For<ServiceFactory>().Use<ServiceFactory>(ctx => t => ctx.GetInstance(t));
             cfg.For<IMediator>().Use<Mediator>();
         });
 
@@ -325,7 +322,7 @@ public class StreamPipelineTests
         });
     }
 
-    [Fact(Skip = "StructureMap does not mix concrete and open generics. Use constraints instead.")]
+    [Fact(Skip = "Lamar does not mix concrete and open generics. Use constraints instead.")]
     public async Task Should_handle_concrete_and_open_generics()
     {
         var output = new Logger();
@@ -338,13 +335,12 @@ public class StreamPipelineTests
                 scanner.WithDefaultConventions();
                 scanner.AddAllTypesOf(typeof(IStreamRequestHandler<,>));
             });
-            cfg.For<Logger>().Singleton().Use(output);
+            cfg.For<Logger>().Use(output);
 
             cfg.For(typeof(IStreamPipelineBehavior<,>)).Add(typeof(OuterBehavior<,>));
             cfg.For(typeof(IStreamPipelineBehavior<,>)).Add(typeof(InnerBehavior<,>));
             cfg.For(typeof(IStreamPipelineBehavior<Ping, Pong>)).Add(typeof(ConcreteBehavior));
 
-            cfg.For<ServiceFactory>().Use<ServiceFactory>(ctx => t => ctx.GetInstance(t));
             cfg.For<IMediator>().Use<Mediator>();
         });
 

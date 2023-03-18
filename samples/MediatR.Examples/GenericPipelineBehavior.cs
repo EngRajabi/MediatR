@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 namespace MediatR.Examples;
 
 public class GenericPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
 {
     private readonly TextWriter _writer;
 
@@ -14,7 +13,7 @@ public class GenericPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TR
         _writer = writer;
     }
 
-    public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
         await _writer.WriteLineAsync("-- Handling Request");
         var response = await next();

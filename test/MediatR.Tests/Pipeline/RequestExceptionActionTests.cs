@@ -5,31 +5,31 @@ using System.Threading;
 using System.Threading.Tasks;
 using MediatR.Pipeline;
 using Shouldly;
-using StructureMap;
+using Lamar;
 using Xunit;
 
 public class RequestExceptionActionTests
 {
     public class Ping : IRequest<Pong>
     {
-        public string Message { get; set; }
+        public string? Message { get; set; }
     }
 
     public class Pong
     {
-        public string Message { get; set; }
+        public string? Message { get; set; }
     }
 
     public abstract class PingPongException : Exception
     {
-        protected PingPongException(string message) : base(message + " Thrown")
+        protected PingPongException(string? message) : base(message + " Thrown")
         {
         }
     }
 
     public class PingException : PingPongException
     {
-        public PingException(string message) : base(message)
+        public PingException(string? message) : base(message)
         {
         }
     }
@@ -49,7 +49,18 @@ public class RequestExceptionActionTests
         }
     }
 
-    public class PingPongExceptionAction<TRequest> : IRequestExceptionAction<TRequest, PingPongException>
+    public class GenericExceptionAction<TRequest> : IRequestExceptionAction<TRequest> where TRequest : notnull
+    {
+        public int ExecutionCount { get; private set; }
+
+        public Task Execute(TRequest request, Exception exception, CancellationToken cancellationToken)
+        {
+            ExecutionCount++;
+            return Task.CompletedTask;
+        }
+    }
+
+    public class PingPongExceptionAction<TRequest> : IRequestExceptionAction<TRequest, PingPongException> where TRequest : notnull
     {
         public bool Executed { get; private set; }
 
@@ -83,7 +94,7 @@ public class RequestExceptionActionTests
     }
 
     [Fact]
-    public async Task Should_run_all_exception_handlers_that_match_base_type()
+    public async Task Should_run_all_exception_actions_that_match_base_type()
     {
         var pingExceptionAction = new PingExceptionAction();
         var pongExceptionAction = new PongExceptionAction();
@@ -95,7 +106,6 @@ public class RequestExceptionActionTests
             cfg.For<IRequestExceptionAction<Ping, PingPongException>>().Use(_ => pingPongExceptionAction);
             cfg.For<IRequestExceptionAction<Ping, PongException>>().Use(_ => pongExceptionAction);
             cfg.For(typeof(IPipelineBehavior<,>)).Add(typeof(RequestExceptionActionProcessorBehavior<,>));
-            cfg.For<ServiceFactory>().Use<ServiceFactory>(ctx => t => ctx.GetInstance(t));
             cfg.For<IMediator>().Use<Mediator>();
         });
 
@@ -107,5 +117,25 @@ public class RequestExceptionActionTests
         pingExceptionAction.Executed.ShouldBeTrue();
         pingPongExceptionAction.Executed.ShouldBeTrue();
         pongExceptionAction.Executed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Should_run_matching_exception_actions_only_once()
+    {
+        var genericExceptionAction = new GenericExceptionAction<Ping>();
+        var container = new Container(cfg =>
+        {
+            cfg.For<IRequestHandler<Ping, Pong>>().Use<PingHandler>();
+            cfg.For<IRequestExceptionAction<Ping>>().Use(_ => genericExceptionAction);
+            cfg.For(typeof(IPipelineBehavior<,>)).Add(typeof(RequestExceptionActionProcessorBehavior<,>));
+            cfg.For<IMediator>().Use<Mediator>();
+        });
+
+        var mediator = container.GetInstance<IMediator>();
+
+        var request = new Ping { Message = "Ping!" };
+        await Assert.ThrowsAsync<PingException>(() => mediator.Send(request));
+
+        genericExceptionAction.ExecutionCount.ShouldBe(1);
     }
 }
